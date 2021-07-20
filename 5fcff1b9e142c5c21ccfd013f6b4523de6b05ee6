@@ -5,6 +5,25 @@
       "robotRunId": "1",
       "fixSuggestions": [],
       "key": {
+        "uuid": "61157a43_c527a4ab",
+        "filename": "COPYING",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000501
+      },
+      "writtenOn": "2021-07-20T08:59:49Z",
+      "side": 1,
+      "message": "File COPYING matching pattern **/*copyi*\n",
+      "revId": "5fcff1b9e142c5c21ccfd013f6b4523de6b05ee6",
+      "serverId": "f53e107a-f6b2-4b25-8f39-b455c25fa705"
+    },
+    {
+      "robotId": "jenkins_robot",
+      "robotRunId": "1",
+      "fixSuggestions": [],
+      "key": {
         "uuid": "ede265bb_34d9aae6",
         "filename": "Makefile.am",
         "patchSetId": 1
