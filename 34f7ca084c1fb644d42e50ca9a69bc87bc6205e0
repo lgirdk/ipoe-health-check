@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e4069d7e_a59610af",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1003683
+      },
+      "writtenOn": "2021-07-20T11:08:20Z",
+      "side": 1,
+      "message": "the header in cfg/Makefile.am will need to be fixed as per the changes being done under https://jira.rdkcentral.com/jira/browse/BD-1005 but approving for now",
+      "revId": "34f7ca084c1fb644d42e50ca9a69bc87bc6205e0",
+      "serverId": "f53e107a-f6b2-4b25-8f39-b455c25fa705"
+    }
+  ]
+}
