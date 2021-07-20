@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6fb207e9_d45bdc0a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1003683
+      },
+      "writtenOn": "2021-07-20T10:58:34Z",
+      "side": 1,
+      "message": "approved, Martin to do ID work in protex later",
+      "revId": "5fcff1b9e142c5c21ccfd013f6b4523de6b05ee6",
+      "serverId": "f53e107a-f6b2-4b25-8f39-b455c25fa705"
+    }
+  ]
+}
