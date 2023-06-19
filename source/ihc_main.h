@@ -21,6 +21,7 @@
 #define __IHC_H__
 
 #include "ipc_msg.h"
+#include <syscfg/syscfg.h>
 
 /********************** Defines ***********************/
 
@@ -34,15 +35,13 @@ as are the health check functions. That is, it is not necessary to restart both 
 
 */
 
-#define IHC_DEFAULT_LIMIT            3
-#define IHC_DEFAULT_REGULAR_INTERVAL 30
-#define IHC_DEFAULT_RETRY_INTERVAL   10
 #define IHC_IFNAME_LENGTH            32
+#define LOG_NAME_SIZE                18
 #define IHC_FAILURE                  -1
 #define IHC_SUCCESS                  0
 
 extern  char g_ifName [IFNAME_LENGTH];
-
+extern  char logdst   [LOG_NAME_SIZE];
 /********************** Enums *************************/
 
 typedef enum
@@ -55,15 +54,15 @@ typedef uint8_t    UBOOL8;
 typedef struct ifreq ifreq_t;
 
 #define IhcError(fmt, arg...) \
-        RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.IHC", fmt "\n", ##arg);
+        RDK_LOG(RDK_LOG_ERROR, logdst, fmt "\n", ##arg);
 #define IhcNotice(fmt, arg...) \
-        RDK_LOG(RDK_LOG_NOTICE, "LOG.RDK.IHC", fmt "\n", ##arg);
+        RDK_LOG(RDK_LOG_NOTICE, logdst, fmt "\n", ##arg);
 #define IhcInfo(fmt, arg...) \
-        RDK_LOG(RDK_LOG_INFO, "LOG.RDK.IHC", fmt "\n", ##arg);
+        RDK_LOG(RDK_LOG_INFO, logdst, fmt "\n", ##arg);
 
 
 /********************** Function declarations **********/
-int ihc_echo_handler(void);
-
+int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit);
+int ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, char* interface); // mv: multi-vlan
 #include "rdk_debug.h"
 #endif //__IHC_H__
