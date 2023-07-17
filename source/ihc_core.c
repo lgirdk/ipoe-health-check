@@ -1628,7 +1628,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                         IhcError("Sending IPOE_MSG_IHC_ECHO_FAIL_IPV4 failed");
                                     }
                                 }
-                                IhcError("IHC_V4_FAIL :: IHC: IPOE health check for IPv4 has failed");
+                                IhcError("IPv4 Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv4 has failed");
                             }
                             else  /*...IPOE v4 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
@@ -1686,7 +1686,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                                     if( ( FALSE == Is_v4_bfd_1stpkt_failure_occurs ) && ( 0 <  g_echo_V4_failure_count ) )
                                     {
-                                        IhcError("IHC_V4_1ST_PKT_FAILURE :: IHC: IPOE health check(IPv4) first packet failure");
+                                        IhcError("IPv4 ping failed on Data interface. IPOE health check(IPv4) first packet failure");
                                         Is_v4_bfd_1stpkt_failure_occurs = TRUE;
                                     }
 
@@ -1742,7 +1742,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                         IhcError("Sending IPOE_MSG_IHC_ECHO_FAIL_IPV6 failed");
                                     }
                                 }
-                                IhcError("IHC_V6_FAIL :: IHC: IPOE health check for IPv6 has failed");
+                                IhcError("IPv6Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv6 has failed");
                             }
                             else  /*...IPOE v6 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
@@ -1788,7 +1788,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                                     if( ( FALSE == Is_v6_bfd_1stpkt_failure_occurs ) && ( g_echo_V6_failure_count > 0 ) )
                                     {
-                                        IhcError("IHC_V6_1ST_PKT_FAILURE :: IHC: IPOE health check(IPv6) first packet failure");
+                                        IhcError("IPv6  ping failed on Data interface. IPOE health check(IPv6) first packet failure");
                                         Is_v6_bfd_1stpkt_failure_occurs = TRUE;
                                     }
 
@@ -1976,10 +1976,12 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
                                  if ( strcmp(logdst, "LOG.RDK.IHCMGMT") == 0 )
                                  {
                                      Event = IPOE_MSG_IHC_ECHO_RENEW_MGMT;
+                                     IhcError("IPv4 Health Check Failed - Recovering Service on Management interface");
                                  }
                                  else
                                  {
                                      Event = IPOE_MSG_IHC_ECHO_RENEW_VOIP;
+                                     IhcError("IPv4 Health Check Failed - Recovering Service on Voice interface");
                                  }
 
                                  if (ihc_broadcastEvent(Event) != IHC_SUCCESS)
@@ -2024,7 +2026,14 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
 
                                           if( ( FALSE == Is_v4_bfd_1stpkt_failure_occurs ) && ( 0 <  g_echo_V4_failure_count ) )
                                           {
-                                              IhcError("IHC_V4_1ST_PKT_FAILURE :: IHC: IPOE health check on mg0 first packet failure");
+                                              if ( strcmp(logdst, "LOG.RDK.IHCMGMT") == 0 )
+                                              {
+                                                  IhcError("IPv4 ping failed on management interface. IPOE health check on mg0 first packet failure");
+                                              }
+                                              else
+                                              {
+                                                  IhcError("IPv4 ping failed on Voice interface. IPOE health check on voip0 first packet failure");
+                                              }
                                               Is_v4_bfd_1stpkt_failure_occurs = TRUE;
                                           }
 
@@ -2032,7 +2041,7 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
                                      } 
                                      else
                                      {
-                                         IhcError("ihc_sendV4EchoPackets for mg0 failed %s", strerror(errno));
+                                         IhcError("ihc_sendV4EchoPackets failed %s", strerror(errno));
                                          g_echo_V4_failure_count++;
                                      }
                                  }
