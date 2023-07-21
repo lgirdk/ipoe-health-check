@@ -44,6 +44,7 @@
 #include "syscfg/syscfg.h"
 #include <ifaddrs.h>
 #include <telemetry_busmessage_sender.h>
+#include <ccsp_syslog.h>
 
 /**************** Defines ***************************************/
 #define IHC_LOOP_TIMOUT 1
@@ -1657,6 +1658,10 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                 /* Take the difference , If the delta time is greater on equal to echo timer interval send the echo packets */
                 if (delta >= ipv4_echo_time_interval)
                 {
+                    if (g_echo_V4_failure_count > 0 && g_send_V4_echo && v4_startup_sequence_completed)
+                    {
+                        syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv4 ping failed");
+                    }
                     if (g_echo_V4_failure_count >= limit) /* broadcast V4 IHC failres */
                     {
                         if (g_send_V4_echo)
@@ -1684,6 +1689,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                     }
                                 }
                                 IhcError("IPv4 Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv4 has failed");
+                                syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv4 Health Check Failed Recovering Service");
                             }
                             else  /*...IPOE v4 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
@@ -1796,6 +1802,10 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                 if(delta >= ipv6_echo_time_interval)
                 {
+                    if (g_echo_V6_failure_count > 0 && g_send_V6_echo && v6_startup_sequence_completed)
+                    {
+                        syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv6 ping failed");
+                    }
                     if (g_echo_V6_failure_count >= limit) /* broadcast V6 IHC failures */
                     {
                         if (g_send_V6_echo)
@@ -1823,6 +1833,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                     }
                                 }
                                 IhcError("IPv6Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv6 has failed");
+                                syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv6Health Check Failed Recovering Service");
                             }
                             else  /*...IPOE v6 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
