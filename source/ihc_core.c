@@ -1658,6 +1658,12 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                 /* Take the difference , If the delta time is greater on equal to echo timer interval send the echo packets */
                 if (delta >= ipv4_echo_time_interval)
                 {
+                    if( ( FALSE == Is_v4_bfd_1stpkt_failure_occurs ) && ( 0 <  g_echo_V4_failure_count ) )
+                    {
+                        IhcError("IPv4 ping failed on Data interface. IPOE health check(IPv4) first packet failure");
+                        Is_v4_bfd_1stpkt_failure_occurs = TRUE;
+                    }
+
                     if (g_echo_V4_failure_count > 0 && g_send_V4_echo && v4_startup_sequence_completed)
                     {
                         syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv4 ping failed");
@@ -1769,14 +1775,8 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                 if (!ihc_sendV4EchoPackets(wanInterface, tmpBNGMACAddress))
                                 {
                                     ipv4_echo_time_interval = retry_interval;
-
-                                    if( ( FALSE == Is_v4_bfd_1stpkt_failure_occurs ) && ( 0 <  g_echo_V4_failure_count ) )
-                                    {
-                                        IhcError("IPv4 ping failed on Data interface. IPOE health check(IPv4) first packet failure");
-                                        Is_v4_bfd_1stpkt_failure_occurs = TRUE;
-                                    }
-
                                     g_echo_V4_failure_count++;
+
                                 }
                                 else
                                 {
@@ -1801,6 +1801,12 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                 if(delta >= ipv6_echo_time_interval)
                 {
+                    if( ( FALSE == Is_v6_bfd_1stpkt_failure_occurs ) && ( g_echo_V6_failure_count > 0 ) )
+                    {
+                        IhcError("IPv6  ping failed on Data interface. IPOE health check(IPv6) first packet failure");
+                        Is_v6_bfd_1stpkt_failure_occurs = TRUE;
+                    }
+
                     if (g_echo_V6_failure_count > 0 && g_send_V6_echo && v6_startup_sequence_completed)
                     {
                         syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv6 ping failed");
@@ -1900,13 +1906,6 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                 if (!ihc_sendV6EchoPackets(wanInterface, tmpBNGMACAddress))
                                 {
                                     ipv6_echo_time_interval = retry_interval;
-
-                                    if( ( FALSE == Is_v6_bfd_1stpkt_failure_occurs ) && ( g_echo_V6_failure_count > 0 ) )
-                                    {
-                                        IhcError("IPv6  ping failed on Data interface. IPOE health check(IPv6) first packet failure");
-                                        Is_v6_bfd_1stpkt_failure_occurs = TRUE;
-                                    }
-
                                     g_echo_V6_failure_count++;
                                 }
                                 else
