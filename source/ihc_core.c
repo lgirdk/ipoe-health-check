@@ -1640,7 +1640,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                     }
                                 }
                                 IhcError("IPv4 Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv4 has failed");
-                                syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv4 Health Check Failed Recovering Service");
+                                syslog_networklog("Network",LOG_CRIT,"%s","IPoE IPv4 Health Check Failed Recovering Service");
                             }
                             else  /*...IPOE v4 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
@@ -1759,7 +1759,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                     }
                                 }
                                 IhcError("IPv6Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv6 has failed");
-                                syslog_networklog("Network",LOG_NOTICE,"%s","IPoE IPv6Health Check Failed Recovering Service");
+                                syslog_networklog("Network",LOG_CRIT,"%s","IPoE IPv6 Health Check Failed Recovering Service");
                             }
                             else  /*...IPOE v6 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
                             {
