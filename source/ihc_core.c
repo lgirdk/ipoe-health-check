@@ -1656,7 +1656,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
             {
                 uint32_t delta = (echoTime.tv_sec + (echoTime.tv_nsec / NANOSEC2SEC)) - echoElapsedTimeV4;
                 /* Take the difference , If the delta time is greater on equal to echo timer interval send the echo packets */
-                if (delta >= ipv4_echo_time_interval)
+                if (g_send_V4_echo && delta >= ipv4_echo_time_interval)
                 {
                     if( ( FALSE == Is_v4_bfd_1stpkt_failure_occurs ) && ( 0 <  g_echo_V4_failure_count ) )
                     {
@@ -1799,7 +1799,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                 delta = (echoTime.tv_sec + (echoTime.tv_nsec / NANOSEC2SEC)) - echoElapsedTimeV6;
 
-                if(delta >= ipv6_echo_time_interval)
+                if(g_send_V6_echo && delta >= ipv6_echo_time_interval)
                 {
                     if( ( FALSE == Is_v6_bfd_1stpkt_failure_occurs ) && ( g_echo_V6_failure_count > 0 ) )
                     {
