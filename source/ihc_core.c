@@ -911,7 +911,7 @@ static int ihc_sendV6EchoPackets(char *interface, char *MACaddress)
     // IPv6 header
 
     // IPv6 version (4 bits), Traffic class (8 bits), Flow label (20 bits)
-    iphdr.ip6_flow = htonl((6 << 28) | (0 << 20) | 0);
+    iphdr.ip6_flow = htonl((6 << 28) | (192 << 20) | 0);
 
     // Payload length (16 bits): UDP header + UDP data
     iphdr.ip6_plen = htons(IHC_UDP_HDRLEN + datalen);
