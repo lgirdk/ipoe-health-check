@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
              strncpy(logdst, RDK_LOG_COMP_NAME_VOIP, sizeof(logdst));
 	}
 
-        ihc_echo_handler_mv(retry_regular_interval, retry_interval, limit, g_ifName);
+        ihc_echo_handler_mv_voip(retry_regular_interval, retry_interval, limit, g_ifName);
     }	    
     
     return IHC_SUCCESS;

@@ -1945,8 +1945,8 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
     return ret;  // We never actually reach this
 }
 
-// Here we check mg0 vlan status
-ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, char* interface)
+// Here we check mg0/voip vlan status
+ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int limit, char* interface)
 {
     // Case fail trigger renew DHCPv4  
     fd_set r_fds;
@@ -1965,9 +1965,15 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
     int ipv4_echo_time_interval = retry_regular_interval;
     uint16_t msgSize = 0;
     ipc_ihc_data_t msgBody;
-    int8_t empty_ip = 1;
     char* IP[IPSIZE];
     msgSize = sizeof(ipc_ihc_data_t);
+    bool ipv6Available = false;
+    bool ipv4Available = false;
+    char defaultGatewayV6[IHC_MAX_STRING_LENGTH] = {0};
+    char BNGMACAddressV6[IHC_MAX_STRING_LENGTH] = {0};
+    int echo_reply_socket_v6 = IHC_FAILURE;
+    uint32_t echoElapsedTimeV6 = 0;
+    int ipv6_echo_time_interval = retry_regular_interval;
 
     // init wan connection data
     memset(&wanConnectionData, 0, msgSize);
@@ -1975,33 +1981,79 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
     IhcInfo("===== Starting IPoE HC for interface %s ======", interface);
     /* Store wan connection data */
     strncpy(wanConnectionData.ifName, interface, sizeof(wanConnectionData.ifName));
-    while( empty_ip == 1 ) {
-       get_interface_ip(interface, IP);
-       IhcInfo("Trying to get Ip for interface %s", interface);
-       if ( strcmp(IP, "0.0.0.0") != 0 )
-       {
-	   strncpy(wanConnectionData.ipv4Address, IP, sizeof(wanConnectionData.ipv4Address));
-	   IhcInfo("Interface %s IP address is %s ",interface, IP);
-	   empty_ip = 0;
-       }
-       sleep(IHC_ECHO_REPLY_TIME_OUT);
-    } 
-
-    if( echo_reply_socket_v4 == IHC_FAILURE && (echo_reply_socket_v4 = ihc_create_echo_reply_socket_v4(interface)) == IHC_FAILURE )
-    {
-         IhcError("echo socket creation failed : %s", strerror(errno));
-         return IHC_FAILURE;
-    }
-
-    if( ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
-    {
-         g_v4_connection = TRUE;
-         ipv4_echo_time_interval = retry_regular_interval; 
-    }
-
     for (;;)
     {
-        if (echo_reply_socket_v4 != IHC_FAILURE )
+        if (!ipv4Available)
+        {
+            get_interface_ip(interface, IP);
+            IhcInfo("Trying to get Ip for interface %s", interface);
+            if (strcmp(IP, "0.0.0.0") != 0)
+            {
+                strncpy(wanConnectionData.ipv4Address, IP, sizeof(wanConnectionData.ipv4Address));
+                IhcInfo("Interface %s IP address is %s ",interface, IP);
+                ipv4Available = true;
+                // create echo reply socket after getting v4 address.
+                if (echo_reply_socket_v4 == IHC_FAILURE && (echo_reply_socket_v4 = ihc_create_echo_reply_socket_v4(interface)) == IHC_FAILURE )
+                {
+                    IhcError("echo socket creation failed : %s", strerror(errno));
+                    return IHC_FAILURE;
+                }
+
+                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
+                {
+                    g_v4_connection = TRUE;
+                    ipv4_echo_time_interval = retry_regular_interval;
+                }
+            }
+        }
+        struct ifaddrs *ifaddr, *ifa;
+        char ipv6[256] = {0};
+        if (getifaddrs(&ifaddr) == 0 && !ipv6Available)
+        {
+            for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+            {
+                if (strcmp(ifa->ifa_name, interface) == 0)
+                {
+                    if (ifa->ifa_addr == NULL)
+                    {
+                        continue;
+                    }
+                    if (ifa->ifa_addr->sa_family == AF_INET6)
+                    {
+                        struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6*) ifa->ifa_addr;
+                        struct in6_addr i_a = sa_in6->sin6_addr;
+                        if (IN6_IS_ADDR_LINKLOCAL(&i_a))
+                        {
+                            IhcError("V6 address not set for %s",interface);
+                        }
+                        else
+                        {
+                            ipv6Available = true;
+                            inet_ntop(AF_INET6, &i_a,ipv6, 256);
+                            strncpy(wanConnectionData.ipv6Address, ipv6, sizeof(wanConnectionData.ipv6Address));
+                            IhcInfo("Interface %s IPv6 address is %s ",interface, ipv6);
+                            // create echo reply socket after getting v6 address.
+                            if (echo_reply_socket_v6 == IHC_FAILURE && (echo_reply_socket_v6 = ihc_create_echo_reply_socket_v6()) == IHC_FAILURE)
+                            {
+                                IhcError("v6 echo socket creation failed : %s", strerror(errno));
+                                freeifaddrs(ifaddr);
+                                return IHC_FAILURE;
+                            }
+
+                            if (ihc_start_echo_packets(IHC_ECHO_TYPE_V6) >= 0)
+                            {
+                                g_v6_connection = TRUE;
+                                /*...After V6 UP, waite for 30s to send echo */
+                                ipv6_echo_time_interval = retry_regular_interval; //Regular Interval 30s
+                            }
+                        }
+                    }
+                }
+            }
+            freeifaddrs(ifaddr);
+        }
+
+        if (echo_reply_socket_v4 != IHC_FAILURE || echo_reply_socket_v6 != IHC_FAILURE)
         {
             FD_ZERO(&r_fds);
             if (echo_reply_socket_v4 != IHC_FAILURE)
@@ -2011,6 +2063,15 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
                 if( echo_reply_socket_v4 > fdCount )
                 {
                     fdCount = echo_reply_socket_v4;
+                }
+            }
+            if (echo_reply_socket_v6 != IHC_FAILURE)
+            {
+                FD_SET(echo_reply_socket_v6, &r_fds);
+
+                if( echo_reply_socket_v6 > fdCount )
+                {
+                    fdCount = echo_reply_socket_v6;
                 }
             }
 
@@ -2066,10 +2127,56 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
                     g_echo_V4_failure_count = 0;
                 }
             }
-
         }
 
-        if (g_send_V4_echo ) 
+        if ((echo_reply_socket_v6 != IHC_FAILURE) && FD_ISSET(echo_reply_socket_v6, &r_fds))
+        {
+            if (recvfrom(echo_reply_socket_v6, recvBuf, sizeof(recvBuf), 0, &srcAddr, &sendsize) < 0)
+            {
+                IhcError("echo reply recvfrom failed: %s", strerror(errno));
+            }
+            else
+            {
+                if (v6_startup_sequence_completed == FALSE)
+                {
+                    ipv6_echo_time_interval = retry_interval; //Retry Interval 10s
+
+                    if (g_echo_V6_failure_count == 1)
+                    {
+                        g_echo_V6_success_count++;
+                        if (g_echo_V6_success_count >= limit)
+                        {
+                            IhcNotice("IHC_V6_STARTUP_COMPLETED :: IHC: IPOE health check(IPv6) startup sequence completed");
+                            v6_startup_sequence_completed = TRUE;
+                            ipv6_echo_time_interval = retry_regular_interval; //Regular Interval 30s
+                            /* Send a message to WAN Manager that the IPV6 connection is up */
+                            if (ihc_broadcastEvent(IPOE_MSG_IHC_ECHO_IPV6_UP) != IHC_SUCCESS)
+                            {
+                                IhcError("Sending IPOE_MSG_IHC_ECHO_IPV6_UP failed");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        g_echo_V6_success_count = 1;
+                    }
+
+                    if ((FALSE == Is_v6_bfd_1stpkt_success_occurs ) && ( 0 < g_echo_V6_success_count))
+                    {
+                        IhcNotice("IHC_V6_1ST_PKT_SUCCESS :: IHC: IPOE health check(IPv6) first packet success");
+                        Is_v6_bfd_1stpkt_success_occurs = TRUE;
+                    }
+                }
+                else // Normal Operation
+                {
+                    ipv6_echo_time_interval = retry_regular_interval; //Regular Interval 30s
+                }
+                IhcInfo("Echo packets V6 RX [%u -> 0]", g_echo_V6_failure_count);
+                g_echo_V6_failure_count = 0;
+            }
+        }
+
+        if (g_send_V4_echo || g_send_V6_echo)
         {
             if (!clock_gettime(CLOCK_MONOTONIC, &echoTime))
             {
@@ -2177,6 +2284,102 @@ ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, c
                     echoElapsedTimeV4 = echoTime.tv_sec + echoTime.tv_nsec / NANOSEC2SEC;
                 }
 
+                delta = (echoTime.tv_sec + (echoTime.tv_nsec / NANOSEC2SEC)) - echoElapsedTimeV6;
+                if(g_send_V6_echo && delta >= ipv6_echo_time_interval)
+                {
+                    if( ( FALSE == Is_v6_bfd_1stpkt_failure_occurs ) && ( g_echo_V6_failure_count > 0 ) )
+                    {
+                        IhcError("IPv6  ping failed on Data interface. IPOE health check(IPv6) first packet failure");
+                        Is_v6_bfd_1stpkt_failure_occurs = TRUE;
+                    }
+                    if (g_echo_V6_failure_count >= limit) /* broadcast V6 IHC failures */
+                    {
+                        if (g_send_V6_echo)
+                        {
+                            IhcInfo("[%s:%d] v6 echo reply failure reached threshold", __FUNCTION__, __LINE__);
+                            /*...Send RENEW/RELAESE in 'Normal Sequence'... */
+                            if( v6_startup_sequence_completed )
+                            {
+                                /*...Send RELEASE if wan_v6_release = TRUE (This will be set from Request packets of DHCPC6)...*/
+                                if( wan_v6_release ) //RELEASE
+                                {
+                                    IhcInfo("Sending IPOE_MSG_IHC_ECHO_FAIL_IPV6 failure");
+                                    if (ihc_broadcastEvent(IPOE_MSG_IHC_ECHO_FAIL_IPV6) != IHC_SUCCESS)
+                                    {
+                                        IhcError("Sending IPOE_MSG_IHC_ECHO_FAIL_IPV6 failed");
+                                    }
+                                }
+                                else  /*...Send RENEW if wan_v6_release = FALSE (This will be set from Request packets of DHCPC6)...*/
+                                {
+                                    IhcInfo("Sending IPOE_MSG_IHC_ECHO_RENEW_IPV6");
+
+                                    if (ihc_broadcastEvent(IPOE_MSG_IHC_ECHO_RENEW_IPV6) != IHC_SUCCESS)
+                                    {
+                                        IhcError("Sending IPOE_MSG_IHC_ECHO_FAIL_IPV6 failed");
+                                    }
+                                }
+                                IhcError("IPv6Health Check Failed - Recovering Service on Data interface. IPOE health check for IPv6 has failed");
+                            }
+                            else  /*...IPOE v6 check goes to IDLE after 3 continuous Failre echo in 'Startup Sequence'... */
+                            {
+                                IhcError("IHC_V6_IDLE :: IHC: IPOE health check(IPv6) IDLE");
+                            }
+                            ihc_stop_echo_packets(IHC_ECHO_TYPE_V6);
+                            ipv6_echo_time_interval = retry_interval;
+                        }
+                    }
+
+                    if (g_send_V6_echo)
+                    {
+                        char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
+                        if ((ret = ihc_get_V6_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV6, sizeof(defaultGatewayV6))) == IHC_SUCCESS)
+                        {
+                            IhcInfo("Sending V6 echo packets interface [%s] defaultGateway [%s]", wanInterface, defaultGatewayV6);
+                            char BNGMACAddress[IHC_MAX_STRING_LENGTH] = {0};
+
+                            //update global mac array if arp cacahe has a new valid mac entry for GW
+                            if (ihc_get_V6_bng_MAC_address(defaultGatewayV6, BNGMACAddress) == IHC_SUCCESS)
+                            {
+                                if( strncasecmp(BNGMACAddressV6, BNGMACAddress, strlen(BNGMACAddress)) )
+                                {
+                                    strncpy(BNGMACAddressV6, BNGMACAddress, IHC_MAX_STRING_LENGTH);
+                                }
+                            }
+                            /* There are different reasons for a lost mac in arp cache. ipoe session should always be active
+                            irrespective of arp cache entry. So send the packet using the current GW mac kept in mac array
+                            */
+                            if( validateMacAddr(BNGMACAddressV6) == IHC_SUCCESS ) // Send V6 echo packets
+                            {
+                                char tmpBNGMACAddress[IHC_MAX_STRING_LENGTH] = {0};
+                                strncpy(tmpBNGMACAddress, BNGMACAddressV6, IHC_MAX_STRING_LENGTH);
+                                if (!ihc_sendV6EchoPackets(wanInterface, tmpBNGMACAddress))
+                                {
+                                    ipv6_echo_time_interval = retry_interval;
+                                    g_echo_V6_failure_count++;
+                                }
+                                else
+                                {
+                                    IhcError("ihc_sendV6EchoPackets failed %s", strerror(errno));
+                                    g_echo_V6_failure_count++;
+                                }
+                            }
+                            else
+                            {
+                                IhcError("ihc_sendV6EchoPackets invalid BNGMAC[%s]",BNGMACAddressV6);
+                                g_echo_V6_failure_count++;
+                            }
+                        }
+                        else
+                        {
+                            IhcInfo("ihc_get_defgateway_wan_interface V6 failed %d", ret); /* it can fail in PPP connections */
+                        }
+                    }
+
+                    if (!clock_gettime(CLOCK_MONOTONIC, &echoTime))
+                    {
+                        echoElapsedTimeV6 = echoTime.tv_sec + echoTime.tv_nsec / NANOSEC2SEC;
+                    }
+                }
             }
         }
         else

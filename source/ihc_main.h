@@ -63,6 +63,6 @@ typedef struct ifreq ifreq_t;
 
 /********************** Function declarations **********/
 int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit);
-int ihc_echo_handler_mv(int retry_regular_interval, int retry_interval, int limit, char* interface); // mv: multi-vlan
+int ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int limit, char* interface); // mv: multi-vlan voip :voip
 #include "rdk_debug.h"
 #endif //__IHC_H__
