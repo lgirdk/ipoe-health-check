@@ -1180,7 +1180,7 @@ static int ihc_sendV4EchoPackets(char *interface, char *MACaddress)
  * 
  * @return int success- actual socket/ failure IHC_FAILURE
  */
-static int ihc_create_echo_reply_socket_v6()
+static int ihc_create_echo_reply_socket_v6(char *interface)
 {
     int     echo_reply_socket_v6 = IHC_FAILURE;
     int     optval;
@@ -1194,10 +1194,22 @@ static int ihc_create_echo_reply_socket_v6()
         return IHC_FAILURE;
     }
 
-    optval = 1;
-    if( setsockopt(echo_reply_socket_v6, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int)) )
+    interface_index = if_nametoindex(interface);
+    if (interface_index != 0)
     {
-        IhcError("echo reply socket V6 SO_REUSEADDR flag set failed : %s", strerror(errno));
+        IhcInfo("interface %s index is %d", interface,interface_index);
+    }
+    else
+    {
+        IhcError("Error while retrieving interface index");
+    }
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), interface);
+
+    if( setsockopt(echo_reply_socket_v6, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr, sizeof(ifr) ) )
+    {
+        IhcError("echo reply socket V6 SO_BINDTODEVICE flag set failed : %s", strerror(errno));
         close(echo_reply_socket_v6);
         return IHC_FAILURE;
     }
@@ -1462,7 +1474,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                     /* DEV-2321 HUB4 - Not sending IPV4 request after 3 renewal - IPoE health check enabled build
                      * Adapt to Broadcom application architecture specification (notes in Jira).
                      */
-                    if( echo_reply_socket_v6 == IHC_FAILURE && (echo_reply_socket_v6 = ihc_create_echo_reply_socket_v6()) == IHC_FAILURE )
+                    if( echo_reply_socket_v6 == IHC_FAILURE && (echo_reply_socket_v6 = ihc_create_echo_reply_socket_v6(msgBody.ifName)) == IHC_FAILURE )
                     {
                         IhcError("v6 echo socket creation failed : %s", strerror(errno));
                         return IHC_FAILURE;
@@ -1983,32 +1995,9 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
     strncpy(wanConnectionData.ifName, interface, sizeof(wanConnectionData.ifName));
     for (;;)
     {
-        if (!ipv4Available)
-        {
-            get_interface_ip(interface, IP);
-            IhcInfo("Trying to get Ip for interface %s", interface);
-            if (strcmp(IP, "0.0.0.0") != 0)
-            {
-                strncpy(wanConnectionData.ipv4Address, IP, sizeof(wanConnectionData.ipv4Address));
-                IhcInfo("Interface %s IP address is %s ",interface, IP);
-                ipv4Available = true;
-                // create echo reply socket after getting v4 address.
-                if (echo_reply_socket_v4 == IHC_FAILURE && (echo_reply_socket_v4 = ihc_create_echo_reply_socket_v4(interface)) == IHC_FAILURE )
-                {
-                    IhcError("echo socket creation failed : %s", strerror(errno));
-                    return IHC_FAILURE;
-                }
-
-                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
-                {
-                    g_v4_connection = TRUE;
-                    ipv4_echo_time_interval = retry_regular_interval;
-                }
-            }
-        }
         struct ifaddrs *ifaddr, *ifa;
         char ipv6[256] = {0};
-        if (getifaddrs(&ifaddr) == 0 && !ipv6Available)
+        if (getifaddrs(&ifaddr) == 0)
         {
             for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
             {
@@ -2018,33 +2007,62 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
                     {
                         continue;
                     }
+                    if (ifa->ifa_addr->sa_family == AF_INET)
+                    {
+                        if (!ipv4Available)
+                        {
+                            IhcInfo("Trying to get Ip for interface %s", interface);
+                            get_interface_ip(interface, IP);
+                            if (strcmp(IP, "0.0.0.0") != 0)
+                            {
+                                strncpy(wanConnectionData.ipv4Address, IP, sizeof(wanConnectionData.ipv4Address));
+                                IhcInfo("Interface %s IP address is %s ",interface, IP);
+                                ipv4Available = true;
+                                // create echo reply socket after getting v4 address.
+                                if (echo_reply_socket_v4 == IHC_FAILURE && (echo_reply_socket_v4 = ihc_create_echo_reply_socket_v4(interface)) == IHC_FAILURE )
+                                {
+                                    IhcError("echo socket creation failed : %s", strerror(errno));
+                                    return IHC_FAILURE;
+                                }
+
+                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
+                                {
+                                    g_v4_connection = TRUE;
+                                    ipv4_echo_time_interval = retry_regular_interval;
+                                }
+                            }
+                        }
+                    }
                     if (ifa->ifa_addr->sa_family == AF_INET6)
                     {
-                        struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6*) ifa->ifa_addr;
-                        struct in6_addr i_a = sa_in6->sin6_addr;
-                        if (IN6_IS_ADDR_LINKLOCAL(&i_a))
+                        if (!ipv6Available)
                         {
-                            IhcError("V6 address not set for %s",interface);
-                        }
-                        else
-                        {
-                            ipv6Available = true;
-                            inet_ntop(AF_INET6, &i_a,ipv6, 256);
-                            strncpy(wanConnectionData.ipv6Address, ipv6, sizeof(wanConnectionData.ipv6Address));
-                            IhcInfo("Interface %s IPv6 address is %s ",interface, ipv6);
-                            // create echo reply socket after getting v6 address.
-                            if (echo_reply_socket_v6 == IHC_FAILURE && (echo_reply_socket_v6 = ihc_create_echo_reply_socket_v6()) == IHC_FAILURE)
+                            struct sockaddr_in6 *sa_in6 = (struct sockaddr_in6*) ifa->ifa_addr;
+                            struct in6_addr i_a = sa_in6->sin6_addr;
+                            if (IN6_IS_ADDR_LINKLOCAL(&i_a))
                             {
-                                IhcError("v6 echo socket creation failed : %s", strerror(errno));
-                                freeifaddrs(ifaddr);
-                                return IHC_FAILURE;
+                                continue;
                             }
-
-                            if (ihc_start_echo_packets(IHC_ECHO_TYPE_V6) >= 0)
+                            else
                             {
-                                g_v6_connection = TRUE;
-                                /*...After V6 UP, waite for 30s to send echo */
-                                ipv6_echo_time_interval = retry_regular_interval; //Regular Interval 30s
+                                ipv6Available = true;
+                                inet_ntop(AF_INET6, &i_a,ipv6, 256);
+                                strncpy(wanConnectionData.ipv6Address, ipv6, sizeof(wanConnectionData.ipv6Address));
+                                IhcInfo("Interface %s IPv6 address is %s ",interface, ipv6);
+                                // create echo reply socket after getting v6 address.
+                                if (echo_reply_socket_v6 == IHC_FAILURE && (echo_reply_socket_v6 = ihc_create_echo_reply_socket_v6(interface)) == IHC_FAILURE)
+                                {
+                                    IhcError("v6 echo socket creation failed : %s", strerror(errno));
+                                    freeifaddrs(ifaddr);
+                                    return IHC_FAILURE;
+                                }
+
+                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V6) >= 0)
+                                {
+                                    g_v6_connection = TRUE;
+                                    /*...After V6 UP, waite for 30s to send echo */
+                                    ipv6_echo_time_interval = retry_regular_interval; //Regular Interval 30s
+                                }
                             }
                         }
                     }
