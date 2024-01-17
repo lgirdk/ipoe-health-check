@@ -2240,6 +2240,15 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
 
                     if (g_send_V4_echo)
                     {
+                        //Check if failure is caused by interface destruction
+                        if ( isInterfaceAvailable(interface_index) == IHC_FAILURE )
+                        {
+                            IhcError("Interface is re-created .. take action to correct the binding !!!!!!! ");
+                            if (ihc_broadcastEvent(IPOE_MSG_IHC_RESTART_DUO_BINDING_ERROR) != IHC_SUCCESS)
+                            {
+                                IhcError("Sending IPOE_MSG_IHC_RESTART_DUO_BINDING_ERROR failed");
+                            }
+                        }
 			// Check if interface got IP before sending the BFD packet to avoid sending while a renew is happening already
 			if ( DoesIntfHasIP( wanConnectionData.ifName) == IHC_SUCCESS )
 			{ 
@@ -2351,6 +2360,15 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
 
                     if (g_send_V6_echo)
                     {
+                        //Check if failure is caused by interface destruction
+                        if ( isInterfaceAvailable(interface_index) == IHC_FAILURE )
+                        {
+                            IhcError("Interface is re-created .. take action to correct the binding !!!!!!! ");
+                            if (ihc_broadcastEvent(IPOE_MSG_IHC_RESTART_DUO_BINDING_ERROR) != IHC_SUCCESS)
+                            {
+                                IhcError("Sending IPOE_MSG_IHC_RESTART_DUO_BINDING_ERROR failed");
+                            }
+                        }
                         char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
                         if ((ret = ihc_get_V6_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV6, sizeof(defaultGatewayV6))) == IHC_SUCCESS)
                         {
