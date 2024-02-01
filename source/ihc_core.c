@@ -400,8 +400,7 @@ static int ihc_get_V4_defgateway_wan_interface(char *interface, size_t interface
         IhcError("[%s: %d] Invalid args..", __FUNCTION__, __LINE__);
         return IHC_FAILURE;
     }
-
-    if(g_v4_connection)
+    if (TRUE)
     {
         /* Get wan interface name. */
         if(IS_EMPTY_STRING(wanConnectionData.ifName))
@@ -461,7 +460,7 @@ static int ihc_get_V4_defgateway_wan_interface(char *interface, size_t interface
  * @return int IHC_SUCCESS on success / IHC_FAILURE on failure
  */
 
-static int ihc_start_echo_packets(eIHCEchoType echoType)
+static int ihc_start_echo_packets(eIHCEchoType echoType, char *defaultGatewayV4)
 {
     char cmd[IHC_MAX_STRING_LENGTH] = {0};
     int ret = IHC_SUCCESS;
@@ -472,14 +471,17 @@ static int ihc_start_echo_packets(eIHCEchoType echoType)
             if (g_send_V4_echo == 0)
             {
                 _write_sysctl_file("/proc/sys/net/ipv4/conf/all/accept_local", 1);
-
+                IhcInfo("[%s: %d] defaultGateway V4 Address :%s", __FUNCTION__, __LINE__, defaultGatewayV4);
                 // Sending ping packet to BNG to resolve ARP,
                 // sometimes MAC address of BNG is not resolved so triggering ARP resolution - happens only once
-                memset(cmd, 0, IHC_MAX_STRING_LENGTH);
-                snprintf(cmd, IHC_MAX_STRING_LENGTH, "ping -c 1 %s", wanConnectionData.ipv4Address);
-                system(cmd);
+                if (!IS_EMPTY_STRING(defaultGatewayV4))
+                {
+                    memset(cmd, 0, IHC_MAX_STRING_LENGTH);
+                    snprintf(cmd, IHC_MAX_STRING_LENGTH, "ping -c 1 %s", defaultGatewayV4);
+                    system(cmd);
 
-                g_send_V4_echo = 1;
+                    g_send_V4_echo = 1;
+                }
             }
             else
             {
@@ -1415,7 +1417,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
     int eRouterMode = 3;
     ipc_ihc_data_t msgBody;
     msgSize = sizeof(ipc_ihc_data_t);
-
+    char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
     char domainName[128] = {0};
 
     // init wan connection data
@@ -1444,8 +1446,12 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                         IhcError("echo socket creation failed : %s", strerror(errno));
                         return IHC_FAILURE;
                     }
-
-                    if( ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
+                    if ((ret = ihc_get_V4_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV4, sizeof(defaultGatewayV4))) == IHC_FAILURE)
+                    {
+                        IhcError("Failed to get defaultGateway V4 address: %s", strerror(errno));
+                        return IHC_FAILURE;
+                    }
+                    if( ihc_start_echo_packets(IHC_ECHO_TYPE_V4, defaultGatewayV4) >= 0)
                     {
                         g_v4_connection = TRUE;
                         ipv4_echo_time_interval = retry_regular_interval; //Regular Interval 30s
@@ -1480,7 +1486,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                         return IHC_FAILURE;
                     }
 
-                    if( ihc_start_echo_packets(IHC_ECHO_TYPE_V6) >= 0)
+                    if( ihc_start_echo_packets(IHC_ECHO_TYPE_V6, NULL) >= 0)
                     {
                         g_v6_connection = TRUE;
                         /*...After V6 UP, waite for 30s to send echo */
@@ -1752,8 +1758,7 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
 
                     if (g_send_V4_echo)
                     {
-                        char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
-                        if ((ret = ihc_get_V4_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV4, sizeof(defaultGatewayV4))) == IHC_SUCCESS)
+                        if (TRUE)
                         {
                             //Check if failure is caused by interface destruction
                             if ( isInterfaceAvailable(interface_index) == IHC_FAILURE )
@@ -1801,10 +1806,6 @@ int ihc_echo_handler(int retry_regular_interval, int retry_interval, int limit)
                                 IhcError("ihc_sendV4EchoPackets invalid BNGMAC[%s]", BNGMACAddressV4);
                                 g_echo_V4_failure_count++;
                             }
-                        }
-                        else
-                        {
-                            IhcInfo("ihc_get_V4_defgateway_wan_interface failed %d", ret); /* it can fail in PPP connection */
                         }
                     }
                     echoElapsedTimeV4 = echoTime.tv_sec + echoTime.tv_nsec / NANOSEC2SEC;
@@ -1988,7 +1989,7 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
     int echo_reply_socket_v6 = IHC_FAILURE;
     uint32_t echoElapsedTimeV6 = 0;
     int ipv6_echo_time_interval = retry_regular_interval;
-
+    char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
     // init wan connection data
     memset(&wanConnectionData, 0, msgSize);
                 
@@ -2026,8 +2027,12 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
                                     IhcError("echo socket creation failed : %s", strerror(errno));
                                     return IHC_FAILURE;
                                 }
-
-                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V4) >= 0)
+                                if ((ret = ihc_get_V4_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV4, sizeof(defaultGatewayV4))) == IHC_FAILURE)
+                                {
+                                    IhcError("Failed to get defaultGateway V4 address: %s", strerror(errno));
+                                    return IHC_FAILURE;
+                                }
+                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V4, defaultGatewayV4) >= 0)
                                 {
                                     g_v4_connection = TRUE;
                                     ipv4_echo_time_interval = retry_regular_interval;
@@ -2059,7 +2064,7 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
                                     return IHC_FAILURE;
                                 }
 
-                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V6) >= 0)
+                                if (ihc_start_echo_packets(IHC_ECHO_TYPE_V6, NULL) >= 0)
                                 {
                                     g_v6_connection = TRUE;
                                     /*...After V6 UP, waite for 30s to send echo */
@@ -2252,8 +2257,7 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
 			// Check if interface got IP before sending the BFD packet to avoid sending while a renew is happening already
 			if ( DoesIntfHasIP( wanConnectionData.ifName) == IHC_SUCCESS )
 			{ 
-                             char wanInterface[IHC_MAX_STRING_LENGTH] = {0};
-                             if ((ret = ihc_get_V4_defgateway_wan_interface(wanInterface, sizeof(wanInterface), defaultGatewayV4, sizeof(defaultGatewayV4))) == IHC_SUCCESS)
+                             if (TRUE)
                              {
                                  IhcInfo("[%s:%d] Sending V4 echo packets interface [%s] defaultGateway [%s]", __FUNCTION__, __LINE__, wanInterface, defaultGatewayV4);
 
@@ -2299,10 +2303,6 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
                                      IhcError("ihc_sendV4EchoPackets invalid BNGMAC[%s]", BNGMACAddressV4);
                                      g_echo_V4_failure_count++;
                                  }
-                             }
-                             else
-                             {
-                                 IhcInfo("ihc_get_V4_defgateway_wan_interface failed %d", ret); /* it can fail in PPP connection */
                              }
 			}
 			else
