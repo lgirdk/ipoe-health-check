@@ -2354,6 +2354,7 @@ ihc_echo_handler_mv_voip(int retry_regular_interval, int retry_interval, int lim
                                 IhcError("IHC_V6_IDLE :: IHC: IPOE health check(IPv6) IDLE");
                             }
                             ihc_stop_echo_packets(IHC_ECHO_TYPE_V6);
+                            ipv6Available = false;
                             ipv6_echo_time_interval = retry_interval;
                         }
                     }
